@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Classifier</title>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        #status {
+            margin: 10px;
+            color: #38bdf8;
+        }
+
+        #webcam-container {
+            margin-top: 20px;
+        }
+
+        canvas {
+            border-radius: 12px;
+            border: 3px solid #38bdf8;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            background: #38bdf8;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0ea5e9;
+        }
+
+        #label-container {
+            margin-top: 20px;
+            width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .label {
+            background: #1e293b;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>AI Image Classifier</h1>
+<p id="status">Click start</p>
+
+<button onclick="init()">Start Camera</button>
+
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+
+<script>
+const URL = "https://teachablemachine.withgoogle.com/models/B5B6A_T667/";
+
+let model, webcam, labelContainer, maxPredictions;
+
+async function init() {
+    try {
+        document.getElementById("status").innerText = "Loading model...";
+
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        document.getElementById("status").innerText = "Starting camera...";
+
+        webcam = new tmImage.Webcam(300, 300, true);
+
+        await webcam.setup();
+        await webcam.play();
+
+        document.getElementById("webcam-container").innerHTML = "";
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+        labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = "";
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const div = document.createElement("div");
+            div.className = "label";
+            labelContainer.appendChild(div);
+        }
+
+        document.getElementById("status").innerText = "Running AI...";
+
+        window.requestAnimationFrame(loop);
+
+    } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText =
+            "❌ Error: " + error.message + " (Allow camera access)";
+    }
+}
+
+async function loop() {
+    webcam.update();
+    await predict();
+    window.requestAnimationFrame(loop);
+}
+
+async function predict() {
+    const prediction = await model.predict(webcam.canvas);
+
+    for (let i = 0; i < prediction.length; i++) {
+        const p = prediction[i];
+        labelContainer.childNodes[i].innerHTML =
+            `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
+    }
+}
+</script>
+
+</body>
+</html>
