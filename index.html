@@ -55,21 +55,21 @@ canvas {
 }
 
 #result {
-    font-size: 24px;
+    font-size: 26px;
     margin-top: 15px;
     font-weight: bold;
 }
 
 .bin {
     margin-top: 15px;
-    font-size: 18px;
+    font-size: 20px;
     padding: 12px;
     border-radius: 8px;
 }
 
-.green { background: #14532d; }
+/* Bin colors */
 .blue { background: #1e3a8a; }
-.gray { background: #374151; }
+.green { background: #14532d; }
 .red { background: #7f1d1d; }
 
 #status {
@@ -104,16 +104,12 @@ const URL = "https://teachablemachine.withgoogle.com/models/B5B6A_T667/";
 
 let model, webcam;
 
-// ♻️ Waste → Bin mapping (EDIT based on your classes)
+// ✅ ONLY YOUR 4 CLASSES
 const wasteBins = {
-    "Plastic": { bin: "Blue Bin (Recyclable)", class: "blue" },
-    "Paper": { bin: "Blue Bin (Recyclable)", class: "blue" },
-    "Glass": { bin: "Green Bin (Recyclable)", class: "green" },
-    "Metal": { bin: "Blue Bin (Recyclable)", class: "blue" },
-    "Organic": { bin: "Green Bin (Wet Waste)", class: "green" },
-    "Food Waste": { bin: "Green Bin (Wet Waste)", class: "green" },
-    "Trash": { bin: "Gray Bin (General Waste)", class: "gray" },
-    "E-Waste": { bin: "Red Bin (Hazardous)", class: "red" }
+    "PLASTIC": { bin: "Blue Bin (Recyclable)", class: "blue" },
+    "PAPER": { bin: "Blue Bin (Recyclable)", class: "blue" },
+    "FOOD": { bin: "Green Bin (Wet Waste)", class: "green" },
+    "BATTERY": { bin: "Red Bin (Hazardous Waste)", class: "red" }
 };
 
 async function init() {
@@ -133,7 +129,7 @@ async function init() {
         window.requestAnimationFrame(loop);
 
     } catch (e) {
-        document.getElementById("status").innerText = "❌ " + e.message;
+        document.getElementById("status").innerText = "Error: " + e.message;
         console.error(e);
     }
 }
@@ -147,24 +143,25 @@ async function loop() {
 async function predict() {
     const predictions = await model.predict(webcam.canvas);
 
+    // Get highest prediction
     let top = predictions.reduce((a, b) =>
         a.probability > b.probability ? a : b
     );
 
-    // Show prediction
-    document.getElementById("result").innerText =
-        `Prediction: ${top.className} (${(top.probability*100).toFixed(1)}%)`;
+    // Show result
+    document.getElementById("result").innerHTML =
+        `${top.className}<br>${(top.probability * 100).toFixed(1)}% confidence`;
 
-    // Show bin info
-    const binData = wasteBins[top.className];
+    // Match bin (auto uppercase fix)
+    const binData = wasteBins[top.className.toUpperCase()];
     const binDiv = document.getElementById("bin-info");
 
     if (binData) {
         binDiv.className = "bin " + binData.class;
-        binDiv.innerText = "➡️ Put in: " + binData.bin;
+        binDiv.innerText = "Put in: " + binData.bin;
     } else {
-        binDiv.className = "bin gray";
-        binDiv.innerText = "⚠️ Unknown category";
+        binDiv.className = "bin";
+        binDiv.innerText = "No bin info available";
     }
 }
 </script>
