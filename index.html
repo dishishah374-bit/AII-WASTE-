@@ -1,27 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>AI Classifier</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- ✅ FIXED SCRIPTS -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<title>AI Waste Classifier</title>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f172a, #020617);
+    color: white;
+    text-align: center;
+}
+
+h1 {
+    margin-top: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+.card {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+
+button {
+    padding: 12px 25px;
+    font-size: 16px;
+    background: #38bdf8;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0ea5e9;
+}
+
+canvas {
+    border-radius: 10px;
+    margin-top: 10px;
+}
+
+#result {
+    font-size: 22px;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+.bin {
+    margin-top: 10px;
+    font-size: 18px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.green { background: #14532d; }
+.blue { background: #1e3a8a; }
+.gray { background: #374151; }
+.red { background: #7f1d1d; }
+
+.bar {
+    height: 10px;
+    background: #334155;
+    border-radius: 5px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+
+.fill {
+    height: 100%;
+    background: #38bdf8;
+}
+
+.label {
+    text-align: left;
+    margin-top: 10px;
+}
+</style>
 </head>
 
-<body style="background:#0f172a;color:white;text-align:center;font-family:Arial;">
+<body>
 
-<h1>AI Image Classifier</h1>
+<div class="container">
+
+<h1>♻️ AI Waste Classifier</h1>
 <p id="status">Click Start</p>
 
 <button onclick="init()">Start Camera</button>
 
-<div id="webcam-container"></div>
-<div id="label-container"></div>
+<div class="card">
+    <div id="webcam-container"></div>
+</div>
+
+<div class="card">
+    <div id="result">Prediction: -</div>
+    <div id="bin-info"></div>
+</div>
+
+<div class="card">
+    <h3>Confidence</h3>
+    <div id="label-container"></div>
+</div>
+
+</div>
 
 <script>
 const URL = "https://teachablemachine.withgoogle.com/models/B5B6A_T667/";
 
 let model, webcam, labelContainer;
+
+// ♻️ Waste → Bin mapping (EDIT if your classes are different)
+const wasteBins = {
+    "Plastic": { bin: "Blue Bin (Recyclable)", class: "blue" },
+    "Paper": { bin: "Blue Bin (Recyclable)", class: "blue" },
+    "Glass": { bin: "Green Bin (Recyclable)", class: "green" },
+    "Metal": { bin: "Blue Bin (Recyclable)", class: "blue" },
+    "Organic": { bin: "Green Bin (Wet Waste)", class: "green" },
+    "Food Waste": { bin: "Green Bin (Wet Waste)", class: "green" },
+    "Trash": { bin: "Gray Bin (General Waste)", class: "gray" },
+    "E-Waste": { bin: "Red Bin (Hazardous)", class: "red" }
+};
 
 async function init() {
     try {
@@ -29,7 +141,7 @@ async function init() {
 
         model = await tmImage.load(URL + "model.json", URL + "metadata.json");
 
-        webcam = new tmImage.Webcam(300, 300, true);
+        webcam = new tmImage.Webcam(320, 320, true);
         await webcam.setup();
         await webcam.play();
 
@@ -40,7 +152,9 @@ async function init() {
         labelContainer.innerHTML = "";
 
         for (let i = 0; i < model.getTotalClasses(); i++) {
-            labelContainer.appendChild(document.createElement("div"));
+            const div = document.createElement("div");
+            div.className = "label";
+            labelContainer.appendChild(div);
         }
 
         document.getElementById("status").innerText = "Running...";
@@ -59,12 +173,36 @@ async function loop() {
 }
 
 async function predict() {
-    const prediction = await model.predict(webcam.canvas);
+    const predictions = await model.predict(webcam.canvas);
 
-    for (let i = 0; i < prediction.length; i++) {
-        labelContainer.childNodes[i].innerHTML =
-            prediction[i].className + ": " +
-            (prediction[i].probability * 100).toFixed(1) + "%";
+    let top = predictions.reduce((a, b) => a.probability > b.probability ? a : b);
+
+    // Show main result
+    document.getElementById("result").innerText =
+        `Prediction: ${top.className} (${(top.probability*100).toFixed(1)}%)`;
+
+    // Show bin info
+    const binData = wasteBins[top.className];
+    const binDiv = document.getElementById("bin-info");
+
+    if (binData) {
+        binDiv.className = "bin " + binData.class;
+        binDiv.innerText = "➡️ Put in: " + binData.bin;
+    } else {
+        binDiv.className = "bin gray";
+        binDiv.innerText = "⚠️ Unknown category";
+    }
+
+    // Confidence bars
+    for (let i = 0; i < predictions.length; i++) {
+        const p = predictions[i];
+
+        labelContainer.childNodes[i].innerHTML = `
+            ${p.className}
+            <div class="bar">
+                <div class="fill" style="width:${p.probability * 100}%"></div>
+            </div>
+        `;
     }
 }
 </script>
